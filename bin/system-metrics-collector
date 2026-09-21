@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+import sys
+import os
+import glob
+import json
+import time
+from pathlib import Path
+
+HOME = Path(os.environ.get("HOME", "/tmp"))
+STATE_DIR = HOME / ".local/state/omarchy/system-metrics"
+STATE_FILE = STATE_DIR / "state.json"
+
+HISTORY_LEN = 20
+
+def read_file(path, default=""):
+    try:
+        with open(path, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return default
+
+class MetricsCollector:
+    def __init__(self):
+        self.prev_cpu = None
+        self.prev_net = None
+        self.prev_time = time.time()
+        
+        # Load existing state if available to preserve history
+        self.history = {
+            "cpu": [0] * HISTORY_LEN,
+            "gpu": [0] * HISTORY_LEN,
+            "net": [0] * HISTORY_LEN
+        }
+        if STATE_FILE.is_file():
+            try:
+                data = json.loads(STATE_FILE.read_text())
+                if "history" in data:
+                    self.history = data["history"]
+            except Exception:
+                pass
+
+    def get_cpu(self):
+        try:
+            with open("/proc/stat", "r") as f:
+                line = f.readline()
+            parts = [int(x) for x in line.split()[1:8]]
+            idle = parts[3] + parts[4]
+            total = sum(parts)
+            
+            usage = 0
+            if self.prev_cpu:
+                prev_idle, prev_total = self.prev_cpu
+                diff_idle = idle - prev_idle
+                diff_total = total - prev_total
+                if diff_total > 0:
+                    usage = int(100 * (diff_total - diff_idle) / diff_total)
+            self.prev_cpu = (idle, total)
+            
+            # Temp
+            cpu_temp = 0
+            for h in glob.glob("/sys/class/hwmon/hwmon*/temp*_input"):
+                name = read_file(os.path.join(os.path.dirname(h), "name"), "")
+                if "coretemp" in name or "k10temp" in name:
+                    val = int(read_file(h, "0"))
+                    if val > 0:
+                        cpu_temp = int(val / 1000)
+                        break
+            return max(0, min(100, usage)), cpu_temp
+        except Exception:
+            return 0, 0
+
+    def get_gpu(self):
+        gpu_path = None
+        for p in glob.glob("/sys/class/drm/card*/device"):
+            if os.path.exists(os.path.join(p, "gpu_busy_percent")):
+                gpu_path = p
+                break
+        
+        if not gpu_path:
+            return 0, 0, 0, 0, 0
+        
+        gpu_util = int(read_file(os.path.join(gpu_path, "gpu_busy_percent"), "0"))
+        vram_total = int(read_file(os.path.join(gpu_path, "mem_info_vram_total"), "0"))
+        vram_used = int(read_file(os.path.join(gpu_path, "mem_info_vram_used"), "0"))
+        vram_pct = int(vram_used / vram_total * 100) if vram_total > 0 else 0
+        
+        gpu_temp = 0
+        for h in glob.glob(os.path.join(gpu_path, "hwmon/hwmon*/temp*_input")):
+            val = int(read_file(h, "0"))
+            if val > 0:
+                gpu_temp = int(val / 1000)
+                break
+        
+        return gpu_util, vram_used, vram_total, vram_pct, gpu_temp
+
+    def get_ram(self):
+        mem_total = 0
+        mem_avail = 0
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"): mem_total = int(line.split()[1]) * 1024
+                    elif line.startswith("MemAvailable:"): mem_avail = int(line.split()[1]) * 1024
+            ram_used = max(0, mem_total - mem_avail)
+            ram_pct = int(ram_used / mem_total * 100) if mem_total > 0 else 0
+            return ram_used, mem_total, ram_pct
+        except Exception:
+            return 0, 0, 0
+
+    def get_net(self):
+        now = time.time()
+        dt = max(0.1, now - self.prev_time)
+        self.prev_time = now
+        
+        rx_bytes = 0
+        tx_bytes = 0
+        try:
+            with open("/proc/net/dev") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 10 and not parts[0].startswith("lo:") and ":" in parts[0]:
+                        rx_bytes += int(parts[1])
+                        tx_bytes += int(parts[9])
+        except Exception:
+            pass
+        
+        rx_rate = 0
+        tx_rate = 0
+        if self.prev_net:
+            prev_rx, prev_tx = self.prev_net
+            rx_rate = max(0, (rx_bytes - prev_rx) / dt)
+            tx_rate = max(0, (tx_bytes - prev_tx) / dt)
+        self.prev_net = (rx_bytes, tx_bytes)
+        
+        return rx_rate, tx_rate
+
+    def collect(self):
+        cpu_usage, cpu_temp = self.get_cpu()
+        gpu_util, vram_used, vram_total, vram_pct, gpu_temp = self.get_gpu()
+        ram_used, ram_total, ram_pct = self.get_ram()
+        rx_rate, tx_rate = self.get_net()
+        
+        # Append to rolling history
+        self.history["cpu"].append(cpu_usage)
+        self.history["cpu"] = self.history["cpu"][-HISTORY_LEN:]
+        
+        self.history["gpu"].append(gpu_util)
+        self.history["gpu"] = self.history["gpu"][-HISTORY_LEN:]
+        
+        # Combined net rate normalized (scaled in KB/s)
+        total_kb = (rx_rate + tx_rate) / 1024
+        self.history["net"].append(total_kb)
+        self.history["net"] = self.history["net"][-HISTORY_LEN:]
+        
+        def fmt_bytes(b):
+            if b >= 1024**3: return f"{b / 1024**3:.1f} GB"
+            if b >= 1024**2: return f"{b / 1024**2:.1f} MB"
+            if b >= 1024: return f"{b / 1024:.1f} KB"
+            return f"{b:.0f} B"
+        
+        def fmt_rate(b):
+            if b >= 1024**2: return f"{b / 1024**2:.1f} MB/s"
+            if b >= 1024: return f"{b / 1024:.0f} KB/s"
+            return f"{b:.0f} B/s"
+
+        state = {
+            "timestamp": int(time.time()),
+            "cpu": {
+                "usage": cpu_usage,
+                "temp": cpu_temp,
+                "text": f"{cpu_usage}%",
+                "tempText": f"{cpu_temp}°C"
+            },
+            "gpu": {
+                "usage": gpu_util,
+                "temp": gpu_temp,
+                "text": f"{gpu_util}%",
+                "tempText": f"{gpu_temp}°C"
+            },
+            "ram": {
+                "usedBytes": ram_used,
+                "totalBytes": ram_total,
+                "percent": ram_pct,
+                "text": f"{ram_pct}%",
+                "detail": f"{fmt_bytes(ram_used)} / {fmt_bytes(ram_total)}"
+            },
+            "vram": {
+                "usedBytes": vram_used,
+                "totalBytes": vram_total,
+                "percent": vram_pct,
+                "text": f"{vram_pct}%",
+                "detail": f"{fmt_bytes(vram_used)} / {fmt_bytes(vram_total)}"
+            },
+            "net": {
+                "rxRate": rx_rate,
+                "txRate": tx_rate,
+                "downText": f"↓ {fmt_rate(rx_rate)}",
+                "upText": f"↑ {fmt_rate(tx_rate)}",
+                "totalKb": total_kb
+            },
+            "history": self.history
+        }
+        
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        STATE_FILE.write_text(json.dumps(state, indent=2) + "\n")
+        return state
+
+def main():
+    collector = MetricsCollector()
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "once"
+    if cmd == "once" or cmd == "get":
+        # Sample twice with 0.1s delta for accurate CPU/Net diff on one-shot
+        collector.get_cpu()
+        collector.get_net()
+        time.sleep(0.1)
+        state = collector.collect()
+        print(json.dumps(state, indent=2))
+    elif cmd == "daemon":
+        while True:
+            state = collector.collect()
+            time.sleep(1.0)
+    else:
+        print(json.dumps(collector.collect(), indent=2))
+
+if __name__ == "__main__":
+    main()
