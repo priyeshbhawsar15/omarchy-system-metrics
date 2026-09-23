@@ -29,7 +29,7 @@ PanelWindow {
   }
 
   margins {
-    top: Commons.Style.space(48)
+    top: Commons.Style.space(455)
     right: Commons.Style.space(16)
   }
 
