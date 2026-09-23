@@ -7,7 +7,7 @@ Item {
   property real percent: 0
   property string title: "Memory"
   property string detail: "0 GB / 0 GB"
-  property color ringColor: "#06b6d4"
+  property color ringColor: Commons.Color.accent
   property color trackColor: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.10)
   property string icon: "󰍛"
 
