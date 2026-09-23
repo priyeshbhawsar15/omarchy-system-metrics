@@ -12,6 +12,9 @@ PanelWindow {
   property var pluginService: null
   property string targetScreenName: "DP-4"
 
+  readonly property color themeAccent: (Commons.Color.bar && Commons.Color.bar.active)
+    ? Commons.Color.bar.active : Commons.Color.accent
+
   screen: {
     const list = Quickshell.screens || []
     for (let i = 0; i < list.length; i++) {
@@ -46,7 +49,7 @@ PanelWindow {
     radius: Commons.Style.space(12)
     color: Qt.rgba(Commons.Color.background.r, Commons.Color.background.g, Commons.Color.background.b, 0.85)
     border.width: 1
-    border.color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.16)
+    border.color: Qt.rgba(metricsWindow.themeAccent.r, metricsWindow.themeAccent.g, metricsWindow.themeAccent.b, 0.25)
     clip: true
 
     ColumnLayout {
@@ -64,7 +67,7 @@ PanelWindow {
 
         Text {
           text: "󰍛"
-          color: Commons.Color.accent
+          color: metricsWindow.themeAccent
           font.family: Commons.Style.font.family
           font.pixelSize: Commons.Style.font.title
         }
@@ -112,7 +115,7 @@ PanelWindow {
             Layout.fillWidth: true
             title: "System RAM"
             icon: "󰘚"
-            ringColor: Commons.Color.accent
+            ringColor: metricsWindow.themeAccent
             percent: metricsWindow.pluginService && metricsWindow.pluginService.metrics ? Number(metricsWindow.pluginService.metrics.ram.percent || 0) : 0
             detail: metricsWindow.pluginService && metricsWindow.pluginService.metrics ? String(metricsWindow.pluginService.metrics.ram.detail || "0 GB") : "0 GB"
           }
@@ -127,7 +130,7 @@ PanelWindow {
             Layout.fillWidth: true
             title: "GPU VRAM"
             icon: "󰢮"
-            ringColor: Commons.Color.accent
+            ringColor: metricsWindow.themeAccent
             percent: metricsWindow.pluginService && metricsWindow.pluginService.metrics ? Number(metricsWindow.pluginService.metrics.vram.percent || 0) : 0
             detail: metricsWindow.pluginService && metricsWindow.pluginService.metrics ? String(metricsWindow.pluginService.metrics.vram.detail || "0 GB") : "0 GB"
           }
@@ -155,7 +158,7 @@ PanelWindow {
 
             Text {
               text: "󰻠"
-              color: Commons.Color.accent
+              color: metricsWindow.themeAccent
               font.family: Commons.Style.font.family
               font.pixelSize: Commons.Style.font.body
             }
@@ -172,7 +175,7 @@ PanelWindow {
 
             Text {
               text: metricsWindow.pluginService && metricsWindow.pluginService.metrics ? (metricsWindow.pluginService.metrics.cpu.text + "  ·  " + metricsWindow.pluginService.metrics.cpu.tempText) : "0% · 0°C"
-              color: Commons.Color.accent
+              color: metricsWindow.themeAccent
               font.family: Commons.Style.font.family
               font.pixelSize: Commons.Style.font.caption
               font.weight: Font.Bold
@@ -182,7 +185,7 @@ PanelWindow {
           SparklineGraph {
             Layout.fillWidth: true
             implicitHeight: 34
-            lineColor: Commons.Color.accent
+            lineColor: metricsWindow.themeAccent
             maxVal: 100
             points: metricsWindow.pluginService && metricsWindow.pluginService.metrics && metricsWindow.pluginService.metrics.history ? metricsWindow.pluginService.metrics.history.cpu : []
           }
@@ -210,7 +213,7 @@ PanelWindow {
 
             Text {
               text: "󰢮"
-              color: Commons.Color.accent
+              color: metricsWindow.themeAccent
               font.family: Commons.Style.font.family
               font.pixelSize: Commons.Style.font.body
             }
@@ -227,7 +230,7 @@ PanelWindow {
 
             Text {
               text: metricsWindow.pluginService && metricsWindow.pluginService.metrics ? (metricsWindow.pluginService.metrics.gpu.text + "  ·  " + metricsWindow.pluginService.metrics.gpu.tempText) : "0% · 0°C"
-              color: Commons.Color.accent
+              color: metricsWindow.themeAccent
               font.family: Commons.Style.font.family
               font.pixelSize: Commons.Style.font.caption
               font.weight: Font.Bold
@@ -237,7 +240,7 @@ PanelWindow {
           SparklineGraph {
             Layout.fillWidth: true
             implicitHeight: 34
-            lineColor: Commons.Color.accent
+            lineColor: metricsWindow.themeAccent
             maxVal: 100
             points: metricsWindow.pluginService && metricsWindow.pluginService.metrics && metricsWindow.pluginService.metrics.history ? metricsWindow.pluginService.metrics.history.gpu : []
           }
@@ -265,7 +268,7 @@ PanelWindow {
 
             Text {
               text: "󰖩"
-              color: Commons.Color.accent
+              color: metricsWindow.themeAccent
               font.family: Commons.Style.font.family
               font.pixelSize: Commons.Style.font.body
             }
@@ -282,7 +285,7 @@ PanelWindow {
 
             Text {
               text: metricsWindow.pluginService && metricsWindow.pluginService.metrics ? (metricsWindow.pluginService.metrics.net.downText + "  " + metricsWindow.pluginService.metrics.net.upText) : "↓ 0 B/s  ↑ 0 B/s"
-              color: Commons.Color.accent
+              color: metricsWindow.themeAccent
               font.family: Commons.Style.font.family
               font.pixelSize: Commons.Style.font.caption
               font.weight: Font.Bold
@@ -292,7 +295,7 @@ PanelWindow {
           SparklineGraph {
             Layout.fillWidth: true
             implicitHeight: 34
-            lineColor: Commons.Color.accent
+            lineColor: metricsWindow.themeAccent
             maxVal: 500
             points: metricsWindow.pluginService && metricsWindow.pluginService.metrics && metricsWindow.pluginService.metrics.history ? metricsWindow.pluginService.metrics.history.net : []
           }
