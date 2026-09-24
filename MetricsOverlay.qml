@@ -15,6 +15,11 @@ PanelWindow {
   readonly property color themeAccent: (Commons.Color.bar && Commons.Color.bar.active)
     ? Commons.Color.bar.active : Commons.Color.accent
 
+  readonly property bool isPinned: pluginService ? pluginService.isPinned : false
+  readonly property bool autohideEnabled: pluginService ? pluginService.autohideEnabled : false
+  property bool isHovered: false
+  readonly property bool isRevealed: !autohideEnabled || isHovered
+
   screen: {
     const list = Quickshell.screens || []
     for (let i = 0; i < list.length; i++) {
@@ -38,19 +43,76 @@ PanelWindow {
   color: "transparent"
 
   WlrLayershell.namespace: "omarchy-system-metrics-hud"
-  WlrLayershell.layer: WlrLayer.Bottom
+  WlrLayershell.layer: isPinned ? WlrLayer.Overlay : WlrLayer.Bottom
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
   exclusionMode: ExclusionMode.Ignore
+
+  mask: Region {
+    x: metricsWindow.isRevealed ? 0 : Math.max(0, metricsWindow.width - 14)
+    y: 0
+    width: metricsWindow.isRevealed ? metricsWindow.width : 14
+    height: metricsWindow.height
+  }
+
+  Timer {
+    id: autoHideTimer
+    interval: 700
+    onTriggered: {
+      if (metricsWindow.autohideEnabled && !cardHoverArea.containsMouse && !edgeHoverArea.containsMouse) {
+        metricsWindow.isHovered = false
+      }
+    }
+  }
+
+  function requestShow() {
+    autoHideTimer.stop()
+    metricsWindow.isHovered = true
+  }
+
+  function requestHide() {
+    if (metricsWindow.autohideEnabled) {
+      autoHideTimer.restart()
+    }
+  }
+
+  // Edge Trigger Sensor
+  MouseArea {
+    id: edgeHoverArea
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    width: 14
+    hoverEnabled: true
+    acceptedButtons: Qt.NoButton
+    z: 100
+    onEntered: metricsWindow.requestShow()
+    onExited: metricsWindow.requestHide()
+  }
 
   Rectangle {
     id: hudFrame
     width: metricsWindow.implicitWidth
     implicitHeight: mainCol.implicitHeight + Commons.Style.space(28)
+    anchors.top: parent.top
+    x: metricsWindow.isRevealed ? 0 : (parent.width + 20)
     radius: Commons.Style.space(12)
     color: Qt.rgba(Commons.Color.background.r, Commons.Color.background.g, Commons.Color.background.b, 0.85)
     border.width: 1
     border.color: Qt.rgba(metricsWindow.themeAccent.r, metricsWindow.themeAccent.g, metricsWindow.themeAccent.b, 0.25)
     clip: true
+
+    Behavior on x {
+      NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+    }
+
+    MouseArea {
+      id: cardHoverArea
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+      onEntered: metricsWindow.requestShow()
+      onExited: metricsWindow.requestHide()
+    }
 
     ColumnLayout {
       id: mainCol
@@ -93,6 +155,68 @@ PanelWindow {
             font.pixelSize: Commons.Style.font.caption
             elide: Text.ElideRight
             Layout.fillWidth: true
+          }
+        }
+
+        // AUTO-HIDE TOGGLE BUTTON
+        Rectangle {
+          width: 28
+          height: 28
+          radius: 6
+          color: metricsWindow.autohideEnabled
+            ? Qt.rgba(metricsWindow.themeAccent.r, metricsWindow.themeAccent.g, metricsWindow.themeAccent.b, 0.25)
+            : (autohideHover.containsMouse ? Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.12) : "transparent")
+          border.width: 1
+          border.color: metricsWindow.autohideEnabled
+            ? metricsWindow.themeAccent : Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.18)
+
+          Text {
+            anchors.centerIn: parent
+            text: metricsWindow.autohideEnabled ? "󰘖" : "󱊒"
+            color: metricsWindow.autohideEnabled ? metricsWindow.themeAccent : Commons.Color.foreground
+            font.family: Commons.Style.font.family
+            font.pixelSize: 14
+          }
+
+          MouseArea {
+            id: autohideHover
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              if (metricsWindow.pluginService) metricsWindow.pluginService.toggleAutohide()
+            }
+          }
+        }
+
+        // PIN TOGGLE BUTTON
+        Rectangle {
+          width: 28
+          height: 28
+          radius: 6
+          color: metricsWindow.isPinned
+            ? Qt.rgba(metricsWindow.themeAccent.r, metricsWindow.themeAccent.g, metricsWindow.themeAccent.b, 0.25)
+            : (pinHover.containsMouse ? Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.12) : "transparent")
+          border.width: 1
+          border.color: metricsWindow.isPinned
+            ? metricsWindow.themeAccent : Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.18)
+
+          Text {
+            anchors.centerIn: parent
+            text: metricsWindow.isPinned ? "󰐃" : "󰤱"
+            color: metricsWindow.isPinned ? metricsWindow.themeAccent : Commons.Color.foreground
+            font.family: Commons.Style.font.family
+            font.pixelSize: 14
+          }
+
+          MouseArea {
+            id: pinHover
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              if (metricsWindow.pluginService) metricsWindow.pluginService.togglePin()
+            }
           }
         }
       }
@@ -301,6 +425,22 @@ PanelWindow {
           }
         }
       }
+    }
+  }
+
+  // Edge Grab Handle Pill (when collapsed in auto-hide mode)
+  Rectangle {
+    anchors.right: parent.right
+    anchors.verticalCenter: hudFrame.verticalCenter
+    width: 6
+    height: 80
+    radius: 3
+    color: metricsWindow.themeAccent
+    opacity: metricsWindow.isRevealed ? 0 : 0.85
+    z: 90
+
+    Behavior on opacity {
+      NumberAnimation { duration: 200 }
     }
   }
 }
