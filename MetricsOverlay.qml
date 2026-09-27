@@ -20,6 +20,10 @@ PanelWindow {
   property bool isHovered: false
   readonly property bool isRevealed: !autohideEnabled || isHovered
 
+  readonly property int cardWidth: 390
+  readonly property int edgeRevealSize: 14
+  readonly property int horizontalInset: Commons.Style.space(16)
+
   screen: {
     const list = Quickshell.screens || []
     for (let i = 0; i < list.length; i++) {
@@ -35,10 +39,10 @@ PanelWindow {
 
   margins {
     top: Commons.Style.space(455)
-    right: Commons.Style.space(16)
+    right: 0
   }
 
-  implicitWidth: 390
+  implicitWidth: cardWidth + horizontalInset
   implicitHeight: hudFrame.implicitHeight
   color: "transparent"
 
@@ -48,9 +52,9 @@ PanelWindow {
   exclusionMode: ExclusionMode.Ignore
 
   mask: Region {
-    x: metricsWindow.isRevealed ? 0 : Math.max(0, metricsWindow.width - 14)
+    x: metricsWindow.isRevealed ? 0 : (metricsWindow.width - metricsWindow.edgeRevealSize)
     y: 0
-    width: metricsWindow.isRevealed ? metricsWindow.width : 14
+    width: metricsWindow.isRevealed ? metricsWindow.width : metricsWindow.edgeRevealSize
     height: metricsWindow.height
   }
 
@@ -81,7 +85,7 @@ PanelWindow {
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    width: 14
+    width: metricsWindow.edgeRevealSize
     hoverEnabled: true
     acceptedButtons: Qt.NoButton
     z: 100
@@ -91,10 +95,10 @@ PanelWindow {
 
   Rectangle {
     id: hudFrame
-    width: metricsWindow.implicitWidth
+    width: metricsWindow.cardWidth
     implicitHeight: mainCol.implicitHeight + Commons.Style.space(28)
     anchors.top: parent.top
-    x: metricsWindow.isRevealed ? 0 : (parent.width + 20)
+    x: metricsWindow.isRevealed ? 0 : (parent.width - metricsWindow.edgeRevealSize)
     radius: Commons.Style.space(12)
     color: Qt.rgba(Commons.Color.background.r, Commons.Color.background.g, Commons.Color.background.b, 0.85)
     border.width: 1
@@ -430,7 +434,7 @@ PanelWindow {
 
   // Edge Grab Handle Pill (when collapsed in auto-hide mode)
   Rectangle {
-    anchors.right: parent.right
+    anchors.left: hudFrame.left
     anchors.verticalCenter: hudFrame.verticalCenter
     width: 6
     height: 80
