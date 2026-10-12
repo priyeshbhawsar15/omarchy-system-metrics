@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Priyesh Bhawsar",
   "license": "MIT",
-  "description": "Real-time CPU, GPU, Network graphs, circular RAM/VRAM meters, and temperatures pinned to monitor DP-4.",
+  "description": "Real-time CPU, GPU, Network graphs, circular RAM/VRAM meters, and temperatures on a configurable monitor.",
   "kinds": [
     "service",
     "overlay"

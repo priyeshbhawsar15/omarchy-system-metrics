@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const context = {};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../ScreenTarget.js'), 'utf8'), context);
+const screens = [{name: 'DP-6'}, {name: 'DP-9'}, {name: 'HDMI-A-1'}];
+assert.equal(context.chooseScreen(screens, 'HDMI-A-1'), screens[2]);
+assert.equal(context.chooseScreen(screens, 'DP-9'), screens[1]);
+assert.equal(context.chooseScreen(screens, ''), screens[1]);
+assert.equal(context.chooseScreen(screens, 'disconnected'), screens[1]);
+assert.equal(context.chooseScreen([screens[0]], ''), screens[0]);
+assert.equal(context.chooseScreen([], ''), null);
+console.log('Screen selection tests passed.');

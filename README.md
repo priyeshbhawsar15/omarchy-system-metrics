@@ -14,3 +14,11 @@ Real-time CPU, GPU, Network graphs, circular RAM/VRAM progress meters, and tempe
 ## License
 
 MIT
+# Monitor selection
+
+Set `targetScreen` in `~/.config/omarchy/system-metrics.json` to the desired
+Hyprland connector name, for example `{"targetScreen": "HDMI-A-1"}`. Changes
+reload automatically. When the target is absent or no target is configured,
+the HUD uses the second connected screen, then the first. Zero screens creates
+no window. Pin and auto-hide preferences remain in the existing state file.
+Screen selection regression tests: `node tests/screen-target.test.cjs`.

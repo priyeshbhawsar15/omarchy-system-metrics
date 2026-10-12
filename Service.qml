@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "ScreenTarget.js" as ScreenTarget
 
 Scope {
   id: root
@@ -16,6 +17,22 @@ Scope {
     : (homeDir + "/.config/omarchy/plugins/priyesh.system-metrics/bin/system-metrics-collector")
   readonly property string stateFilePath: homeDir + "/.local/state/omarchy/system-metrics/state.json"
   readonly property string settingsFilePath: homeDir + "/.local/state/omarchy/system-metrics/settings.json"
+  property string targetScreen: ""
+
+  FileView {
+    id: configWatcher
+    path: root.homeDir + "/.config/omarchy/system-metrics.json"
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+      try {
+        const config = JSON.parse(configWatcher.text())
+        root.targetScreen = typeof config.targetScreen === "string" ? config.targetScreen : ""
+      } catch (error) {
+        console.warn("System Metrics: invalid screen configuration", error)
+      }
+    }
+  }
 
   property var metrics: ({
     cpu: { usage: 0, temp: 0, text: "0%", tempText: "0°C" },
@@ -135,8 +152,7 @@ Scope {
   Variants {
     model: {
       const screens = Quickshell.screens || []
-      const target = screens.find(screen => screen.name === "DP-4")
-      const selected = target || screens[1] || screens[0]
+      const selected = ScreenTarget.chooseScreen(screens, root.targetScreen)
       return selected ? [selected] : []
     }
     MetricsOverlay {
